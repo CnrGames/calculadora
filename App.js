@@ -1,323 +1,218 @@
+// UltraSimpleCalculatorV3_Rows.js
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, FlatList } from 'react-native';
 
 const { width } = Dimensions.get('window');
-const TAMANHO_BOTAO = width / 4.5;
+const NUM_COLUMNS_FOR_CALC = 4; // We conceptually think in 4 columns for sizing
+const BUTTON_ROW_MARGIN_BOTTOM = 10;
+const BUTTON_INTER_MARGIN = 10; // Margin between buttons in a row
+const BUTTON_CONTAINER_PADDING_HORIZONTAL = 10; // Padding on the sides of the button area
+
+// Calculate the size of a single "slot" in our 4-column grid
+const BUTTON_SLOT_SIZE =
+  (width - BUTTON_CONTAINER_PADDING_HORIZONTAL * 2 - BUTTON_INTER_MARGIN * (NUM_COLUMNS_FOR_CALC - 1)) /
+  NUM_COLUMNS_FOR_CALC;
 
 export default function App() {
-  const [valorExibido, setValorExibido] = useState('0');
-  const [operandoAnterior, setOperandoAnterior] = useState(null);
-  const [operadorSelecionado, setOperadorSelecionado] = useState(null); // Renomeado para clareza
-  const [esperandoOperando, setEsperandoOperando] = useState(false);
+  const [display, setDisplay] = useState('0');
+  const [operand1, setOperand1] = useState(null);
+  const [operator, setOperator] = useState(null);
+  const [isNextInputNew, setIsNextInputNew] = useState(false);
 
-  const aoPressionarNumero = (numero) => {
-    if (valorExibido === 'Erro') { // Se houver erro, limpa antes de digitar novo número
-      setValorExibido(String(numero));
-      setEsperandoOperando(false); // Permite continuar normalmente
-      // Não reseta o operadorSelecionado aqui, para permitir 5 + Erro -> C -> 5 + 3
-    } else if (esperandoOperando) {
-      setValorExibido(String(numero));
-      setEsperandoOperando(false);
+  const performCalculation = () => {
+    const num1 = parseFloat(operand1);
+    const num2 = parseFloat(display);
+    if (isNaN(num1) || isNaN(num2)) return 'Error';
+    switch (operator) {
+      case '+': return num1 + num2;
+      case '-': return num1 - num2;
+      case '*': return num1 * num2;
+      case '/': return num2 === 0 ? 'Error' : num1 / num2;
+      default: return 'Error';
+    }
+  };
+
+  const handleNumberPress = (number) => {
+    if (display === 'Error') { setDisplay(String(number)); setIsNextInputNew(false); return; }
+    if (isNextInputNew) { setDisplay(String(number)); setIsNextInputNew(false); }
+    else { setDisplay(display === '0' ? String(number) : display + number); }
+  };
+
+  const handleDecimalPress = () => {
+    if (display === 'Error') { setDisplay('0.'); setIsNextInputNew(false); return; }
+    if (isNextInputNew) { setDisplay('0.'); setIsNextInputNew(false); }
+    else if (!display.includes('.')) { setDisplay(display + '.'); }
+  };
+
+  const handleOperatorPress = (op) => {
+    if (display === 'Error') return;
+    if (operand1 !== null && operator && !isNextInputNew) {
+      const result = performCalculation();
+      if (result === 'Error') {
+        setDisplay('Error'); setOperand1(null); setOperator(null); setIsNextInputNew(true); return;
+      }
+      setDisplay(String(result)); setOperand1(String(result));
     } else {
-      setValorExibido(valorExibido === '0' ? String(numero) : valorExibido + numero);
+      setOperand1(display);
+    }
+    setOperator(op); setIsNextInputNew(true);
+  };
+
+  const handleEqualsPress = () => {
+    if (operand1 && operator && !isNextInputNew) {
+      const result = performCalculation();
+      setDisplay(String(result));
+      setOperand1(null); setOperator(null); setIsNextInputNew(true);
     }
   };
 
-  const aoPressionarDecimal = () => {
-    if (valorExibido === 'Erro') { // Se houver erro, não permite decimal
-      return;
-    }
-    if (esperandoOperando) { // Se estiver esperando operando, começa com "0."
-      setValorExibido('0.');
-      setEsperandoOperando(false);
-    } else if (!valorExibido.includes('.')) {
-      setValorExibido(valorExibido + '.');
-      setEsperandoOperando(false);
-    }
+  const handleClearPress = () => {
+    setDisplay('0'); setOperand1(null); setOperator(null); setIsNextInputNew(false);
   };
 
-  const aoPressionarOperador = (proximoOperador) => {
-    // Se o valor exibido for "Erro", e um operador for pressionado,
-    // resetamos para '0' e definimos o novo operador.
-    if (valorExibido === 'Erro') {
-      setValorExibido('0');
-      setOperandoAnterior(null); // Limpa operando anterior se estava em erro
-      // O operadorSelecionado será definido abaixo
+  // --- Button Layout Definition (Array of Rows) ---
+  // Each inner array is a row. Each object is a button in that row.
+  // `text`: Display text. `op`: Operator value. `action`: Special action. `span`: Column span.
+  const buttonRows = [
+    [
+      { id: 'ac', text: 'AC', action: handleClearPress, styleType: 'lightGray', span: 3 },
+      { id: 'divide', text: '÷', op: '/', action: () => handleOperatorPress('/'), styleType: 'orange', span: 1 },
+    ],
+    [
+      { id: '7', text: '7', action: () => handleNumberPress('7'), styleType: 'darkGray' },
+      { id: '8', text: '8', action: () => handleNumberPress('8'), styleType: 'darkGray' },
+      { id: '9', text: '9', action: () => handleNumberPress('9'), styleType: 'darkGray' },
+      { id: 'multiply', text: '×', op: '*', action: () => handleOperatorPress('*'), styleType: 'orange' },
+    ],
+    [
+      { id: '4', text: '4', action: () => handleNumberPress('4'), styleType: 'darkGray' },
+      { id: '5', text: '5', action: () => handleNumberPress('5'), styleType: 'darkGray' },
+      { id: '6', text: '6', action: () => handleNumberPress('6'), styleType: 'darkGray' },
+      { id: 'subtract', text: '-', op: '-', action: () => handleOperatorPress('-'), styleType: 'orange' },
+    ],
+    [
+      { id: '1', text: '1', action: () => handleNumberPress('1'), styleType: 'darkGray' },
+      { id: '2', text: '2', action: () => handleNumberPress('2'), styleType: 'darkGray' },
+      { id: '3', text: '3', action: () => handleNumberPress('3'), styleType: 'darkGray' },
+      { id: 'add', text: '+', op: '+', action: () => handleOperatorPress('+'), styleType: 'orange' },
+    ],
+    [
+      { id: '0', text: '0', action: () => handleNumberPress('0'), styleType: 'darkGray', span: 2 },
+      { id: 'decimal', text: '.', action: handleDecimalPress, styleType: 'darkGray' },
+      { id: 'equals', text: '=', action: handleEqualsPress, styleType: 'orange' },
+    ],
+  ];
+
+  // --- Render a Single Button ---
+  const renderCalculatorButton = (buttonConfig, index, isLastInRow) => {
+    const span = buttonConfig.span || 1;
+    const buttonWidth = BUTTON_SLOT_SIZE * span + BUTTON_INTER_MARGIN * (span - 1);
+
+    let buttonStyle = [styles.button, { width: buttonWidth }];
+    let textStyle = [styles.buttonText];
+
+    if (!isLastInRow) { // Add right margin to all but the last button in a row
+      buttonStyle.push({ marginRight: BUTTON_INTER_MARGIN });
     }
 
-    const valorEntrada = parseFloat(valorExibido);
-
-    // Se já existe um operador e não estamos esperando um novo operando (ou seja, um número foi digitado após o último operador)
-    // E o operandoAnterior não é nulo (temos uma operação anterior para calcular)
-    if (operadorSelecionado && operandoAnterior !== null && !esperandoOperando) {
-      const resultadoParcial = calcular(operandoAnterior, valorEntrada, operadorSelecionado);
-      if (isNaN(resultadoParcial)) {
-        setValorExibido('Erro');
-        setOperandoAnterior(null);
-        setOperadorSelecionado(null);
-        setEsperandoOperando(true); // Espera uma nova entrada que limpará o erro
-        return;
-      }
-      setValorExibido(String(parseFloat(resultadoParcial.toFixed(7))));
-      setOperandoAnterior(resultadoParcial);
-    } else {
-      // Se não, apenas armazena o valor de entrada como o operando anterior.
-      setOperandoAnterior(valorEntrada);
+    if (buttonConfig.styleType === 'lightGray') {
+      buttonStyle.push(styles.buttonLightGray);
+      textStyle.push(styles.textBlack);
+    } else if (buttonConfig.styleType === 'darkGray') {
+      buttonStyle.push(styles.buttonDarkGray);
+    } else if (buttonConfig.styleType === 'orange') {
+      buttonStyle.push(styles.buttonOrange);
     }
 
-    setEsperandoOperando(true); // Agora estamos esperando o próximo número
-    setOperadorSelecionado(proximoOperador); // Define o novo operador como ativo
-  };
+    if (buttonConfig.text === '0' && span > 1) buttonStyle.push(styles.buttonZeroAlign);
+    if (buttonConfig.text === 'AC' && span > 1) buttonStyle.push(styles.buttonAcAlign);
 
-  // Função de cálculo agora recebe os operandos e o operador como argumentos
-  const calcular = (valAnterior, valAtual, op) => {
-    const valorAnteriorNum = parseFloat(valAnterior);
-    const valorAtualNum = parseFloat(valAtual);
-
-    if (isNaN(valorAnteriorNum) || isNaN(valorAtualNum)) return NaN; // Retorna NaN se algum valor não for número
-
-    switch (op) {
-      case '+':
-        return valorAnteriorNum + valorAtualNum;
-      case '-':
-        return valorAnteriorNum - valorAtualNum;
-      case '*':
-        return valorAnteriorNum * valorAtualNum;
-      case '/':
-        return valorAtualNum === 0 ? NaN : valorAnteriorNum / valorAtualNum; // Retorna NaN em divisão por zero
-      default:
-        return valorAtualNum;
-    }
-  };
-
-  const aoPressionarIgual = () => {
-    if (operadorSelecionado && operandoAnterior !== null) {
-      if (valorExibido === 'Erro') { // Se já está em erro, não faz nada no igual
-        return;
-      }
-      const resultado = calcular(operandoAnterior, parseFloat(valorExibido), operadorSelecionado);
-      if (isNaN(resultado)) {
-        setValorExibido('Erro');
-      } else {
-        setValorExibido(String(parseFloat(resultado.toFixed(7))));
-      }
-      // Mantém o resultado no operandoAnterior para cálculos contínuos (ex: 5 + 5 = 10, depois pressionar + e outro número)
-      // Se quisermos que o igual finalize a cadeia, setOperandoAnterior(null)
-      setOperandoAnterior(resultado); // Para permitir 2*3=6, depois *2=12
-      setOperadorSelecionado(null); // Limpa o operador ativo após o igual
-      setEsperandoOperando(true); // Espera uma nova entrada, que pode ser um número (inicia novo cálculo) ou operador (continua com resultado)
-    }
-  };
-
-  const aoPressionarLimpar = () => {
-    if (valorExibido === '0' && operandoAnterior === null && operadorSelecionado === null) { // Comportamento AC
-      // Já está tudo limpo, não precisa fazer nada extra ou se for AC
-    } else if (esperandoOperando && operadorSelecionado && valorExibido !== 'Erro') { // Comportamento C quando um operador está ativo
-      // Se um operador está ativo e estamos esperando o próximo operando,
-      // limpar deve resetar o valor exibido para 0, mas manter o operandoAnterior e o operador
-      // Ex: 5 + , pressiona C -> visor vai pra 0, mas ainda estamos em "5 +" esperando o próximo.
-      // No entanto, a UX comum do iOS é que C limpa a entrada atual e se torna AC.
-      // A UX mais comum é que C limpa a entrada atual para 0. Se C for pressionado novamente, vira AC.
-      // Se o botão é 'C' (ou seja, valorExibido não é '0' ou um operador está ativo)
-      setValorExibido('0');
-      // Não reseta esperandoOperando aqui, pois o usuário pode querer digitar um novo número para a operação pendente
-      // Se o usuário pressionar C quando um operador está ativo (ex: 5 +), ele espera que o display volte a 0
-      // e ele possa digitar um novo segundo operando.
-      // Se ele pressionar C novamente, aí sim vira AC.
-      // A lógica do texto do botão (C/AC) já cuida disso.
-      // Se o valor exibido se tornou '0' e não há operador, o botão vira 'AC'.
-    } else { // Comportamento AC ou C que limpa tudo
-      setValorExibido('0');
-      setOperandoAnterior(null);
-      setOperadorSelecionado(null);
-      setEsperandoOperando(false);
-    }
-  };
-
-
-  const aoPressionarMaisMenos = () => {
-    if (valorExibido === 'Erro') return;
-    const valorNumerico = parseFloat(valorExibido);
-    if (valorNumerico === 0 && valorExibido.startsWith('-')) { // Caso de "-0"
-      setValorExibido('0');
-    } else if (valorNumerico === 0) { // Caso de "0"
-      return;
-    } else {
-      setValorExibido(String(valorNumerico * -1));
-    }
-    // setEsperandoOperando(false); // Se um número foi alterado, não estamos mais "esperando" no mesmo sentido.
-  };
-
-  const aoPressionarPorcentagem = () => {
-    if (valorExibido === 'Erro') return;
-    const valorNumerico = parseFloat(valorExibido);
-    let resultadoPorcentagem;
-
-    if (operandoAnterior !== null && operadorSelecionado) {
-      // Calcula a porcentagem em relação ao operandoAnterior
-      // Ex: 100 + 10% (de 100) = 100 + 10 = 110
-      // Ex: 100 * 10% (0.1) = 10
-      const porcentagemDoAnterior = (parseFloat(operandoAnterior) * valorNumerico) / 100;
-      if (operadorSelecionado === '+' || operadorSelecionado === '-') {
-        resultadoPorcentagem = porcentagemDoAnterior;
-      } else if (operadorSelecionado === '*' || operadorSelecionado === '/') {
-        resultadoPorcentagem = valorNumerico / 100; // Para multiplicação/divisão, % geralmente significa valor/100
-      } else {
-        resultadoPorcentagem = valorNumerico / 100;
-      }
-    } else {
-      // Se não houver operação pendente, calcula valor/100
-      resultadoPorcentagem = valorNumerico / 100;
-    }
-    setValorExibido(String(parseFloat(resultadoPorcentagem.toFixed(7))));
-    // setEsperandoOperando(true); // Comportamento pode variar; iOS parece não mudar isso
-  };
-
-
-  const renderizarBotao = (texto, onPress, estiloBase, estiloTextoBase, simboloOperador = null) => {
-    const ativo = simboloOperador === operadorSelecionado && esperandoOperando; // Botão de operador está ativo se corresponde ao selecionado E estamos esperando o próximo operando
-
-    let estiloBotao = [estilos.botao, estiloBase];
-    let estiloTexto = [estilos.textoBotao, estiloTextoBase];
-
-    if (ativo) {
-      // Inverte cores para feedback de operador ativo
-      if (estiloBase === estilos.botaoLaranja) {
-        estiloBotao.push(estilos.botaoLaranjaAtivo);
-        estiloTexto.push(estilos.textoLaranjaAtivo);
-      }
-    }
 
     return (
       <TouchableOpacity
-        style={estiloBotao}
-        onPress={onPress}
+        key={buttonConfig.id}
+        style={buttonStyle}
+        onPress={buttonConfig.action}
       >
-        <Text style={estiloTexto}>{texto}</Text>
+        <Text style={textStyle}>{buttonConfig.text}</Text>
       </TouchableOpacity>
     );
   };
 
-  // Determina o texto do botão AC/C
-  // Se valorExibido não é '0' E não estamos esperando um operando (ou seja, estamos no meio da digitação do primeiro ou segundo número), é 'C'
-  // OU se valorExibido é '0' MAS um operador está ativo (ex: 5 + 0), também é 'C' para limpar o '0' e digitar novo segundo operando.
-  // OU se valorExibido é 'Erro', é 'C'
-  // Senão é 'AC'
-  const textoLimpar = (valorExibido !== '0' && !esperandoOperando) || (esperandoOperando && operadorSelecionado) || valorExibido === 'Erro' ? 'C' : 'AC';
-
+  // --- Render a Row of Buttons ---
+  const renderButtonRow = ({ item: rowButtons, index: rowIndex }) => (
+    <View style={styles.buttonRow}>
+      {rowButtons.map((buttonConfig, buttonIndex) =>
+        renderCalculatorButton(buttonConfig, buttonIndex, buttonIndex === rowButtons.length - 1)
+      )}
+    </View>
+  );
 
   return (
-    <View style={estilos.container}>
-      <View style={estilos.visorContainer}>
-        <Text style={estilos.textoVisor} numberOfLines={1} ellipsizeMode="head">
-          {valorExibido}
+    <View style={styles.container}>
+      <View style={styles.displayContainer}>
+        <Text style={styles.displayText} numberOfLines={1} ellipsizeMode="head">
+          {display}
         </Text>
       </View>
-
-      <View style={estilos.tecladoContainer}>
-        <View style={estilos.linhaBotoes}>
-          {renderizarBotao(textoLimpar, aoPressionarLimpar, estilos.botaoCinzaClaro, estilos.textoPreto)}
-          {renderizarBotao('+/-', aoPressionarMaisMenos, estilos.botaoCinzaClaro, estilos.textoPreto)}
-          {renderizarBotao('%', aoPressionarPorcentagem, estilos.botaoCinzaClaro, estilos.textoPreto)}
-          {renderizarBotao('÷', () => aoPressionarOperador('/'), estilos.botaoLaranja, estilos.textoBranco, '/')}
-        </View>
-
-        <View style={estilos.linhaBotoes}>
-          {renderizarBotao('7', () => aoPressionarNumero(7), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('8', () => aoPressionarNumero(8), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('9', () => aoPressionarNumero(9), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('×', () => aoPressionarOperador('*'), estilos.botaoLaranja, estilos.textoBranco, '*')}
-        </View>
-
-        <View style={estilos.linhaBotoes}>
-          {renderizarBotao('4', () => aoPressionarNumero(4), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('5', () => aoPressionarNumero(5), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('6', () => aoPressionarNumero(6), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('-', () => aoPressionarOperador('-'), estilos.botaoLaranja, estilos.textoBranco, '-')}
-        </View>
-
-        <View style={estilos.linhaBotoes}>
-          {renderizarBotao('1', () => aoPressionarNumero(1), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('2', () => aoPressionarNumero(2), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('3', () => aoPressionarNumero(3), estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('+', () => aoPressionarOperador('+'), estilos.botaoLaranja, estilos.textoBranco, '+')}
-        </View>
-
-        <View style={estilos.linhaBotoes}>
-          {renderizarBotao('0', () => aoPressionarNumero(0), [estilos.botaoCinzaEscuro, estilos.botaoZero], estilos.textoBranco)}
-          {renderizarBotao('.', aoPressionarDecimal, estilos.botaoCinzaEscuro, estilos.textoBranco)}
-          {renderizarBotao('=', aoPressionarIgual, estilos.botaoLaranja, estilos.textoBranco)}
-        </View>
+      <View style={styles.buttonsAreaContainer}>
+        <FlatList
+          data={buttonRows}
+          renderItem={renderButtonRow}
+          keyExtractor={(item, index) => `row-${index}`}
+        />
       </View>
     </View>
   );
 }
 
-const estilos = StyleSheet.create({
+// --- Styles ---
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
     justifyContent: 'flex-end',
   },
-  visorContainer: {
+  displayContainer: {
     paddingHorizontal: 25,
     paddingBottom: 20,
-    justifyContent: 'flex-end',
     alignItems: 'flex-end',
-    minHeight: 120,
+    minHeight: 100,
   },
-  textoVisor: {
+  displayText: {
     fontSize: 70,
     color: '#fff',
     fontWeight: '300',
   },
-  tecladoContainer: {
+  buttonsAreaContainer: { // Container for all button rows
+    paddingHorizontal: BUTTON_CONTAINER_PADDING_HORIZONTAL,
     paddingBottom: 20,
   },
-  linhaBotoes: {
+  buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    marginBottom: TAMANHO_BOTAO * 0.15,
+    marginBottom: BUTTON_ROW_MARGIN_BOTTOM,
+    // justifyContent: 'space-between', // No longer needed with explicit margins
   },
-  botao: {
-    width: TAMANHO_BOTAO,
-    height: TAMANHO_BOTAO,
-    borderRadius: TAMANHO_BOTAO / 2,
+  button: {
+    height: BUTTON_SLOT_SIZE,
+    borderRadius: BUTTON_SLOT_SIZE / 2,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 5,
   },
-  textoBotao: {
-    fontSize: TAMANHO_BOTAO * 0.4,
+  buttonText: {
+    fontSize: BUTTON_SLOT_SIZE * 0.4,
     color: '#fff',
   },
-  botaoCinzaClaro: {
-    backgroundColor: '#a5a5a5',
-  },
-  botaoCinzaEscuro: {
-    backgroundColor: '#333333',
-  },
-  botaoLaranja: {
-    backgroundColor: '#f1a33c',
-  },
-  botaoLaranjaAtivo: { // Novo estilo para operador ativo
-    backgroundColor: '#fff', // Fundo branco
-  },
-  textoLaranjaAtivo: { // Novo estilo para texto do operador ativo
-    color: '#f1a33c', // Texto laranja
-  },
-  botaoZero: {
-    width: TAMANHO_BOTAO * 2 + TAMANHO_BOTAO * 0.15, // O cálculo original da margem era TAMANHO_BOTAO * 0.15 / 2 (aproximadamente), mas como os botões têm margin: 5, podemos usar o margin diretamente.
-    // Se cada botão tem margin: 5, são 2*5 = 10 de margem entre 3 botões.
-    // O ideal é usar o mesmo espaçamento da justifyContent: 'space-evenly'.
-    // Para simplificar, vamos manter o cálculo original que considera o espaço entre botões.
+  buttonLightGray: { backgroundColor: '#a5a5a5' },
+  buttonDarkGray: { backgroundColor: '#333333' },
+  buttonOrange: { backgroundColor: '#f1a33c' },
+  textBlack: { color: '#000' },
+  buttonZeroAlign: {
     alignItems: 'flex-start',
-    paddingLeft: TAMANHO_BOTAO * 0.4,
+    paddingLeft: BUTTON_SLOT_SIZE * 0.35,
   },
-  textoPreto: {
-    color: '#000',
-  },
-  textoBranco: {
-    color: '#fff',
+  buttonAcAlign: {
+    alignItems: 'flex-start',
+    paddingLeft: BUTTON_SLOT_SIZE * 0.35,
   },
 });

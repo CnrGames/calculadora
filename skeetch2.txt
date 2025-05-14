@@ -1,0 +1,394 @@
+// skeetch2_flatlist.txt
+import React, { useState, useMemo } from 'react'; // Added useMemo
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, FlatList } from 'react-native'; // Added FlatList
+
+const { width } = Dimensions.get('window');
+const TAMANHO_BOTAO = width / 4.5;
+const MARGIN_HORIZONTAL_BOTAO = TAMANHO_BOTAO * 0.05; // Horizontal margin for each button
+const MARGIN_VERTICAL_BOTAO_ROW = TAMANHO_BOTAO * 0.15; // Vertical margin between rows
+
+// Constantes para mensagens de erro
+const MENSAGEM_EXPRESSAO_INVALIDA = 'Expressao invalida';
+const MENSAGEM_ERRO_CALCULO = 'Erro';
+
+export default function App() {
+  const [valorExibido, setValorExibido] = useState('0');
+  const [operandoAnterior, setOperandoAnterior] = useState(null);
+  const [operadorSelecionado, setOperadorSelecionado] = useState(null);
+  const [esperandoOperando, setEsperandoOperando] = useState(false);
+  const [temErro, setTemErro] = useState(false);
+
+  const limparErro = () => {
+    if (temErro) {
+      setTemErro(false);
+    }
+  };
+
+  const definirErro = (mensagem) => {
+    setValorExibido(mensagem);
+    setTemErro(true);
+  };
+
+  const aoPressionarNumero = (numero) => {
+    if (temErro) {
+      setValorExibido(String(numero));
+      limparErro();
+      setEsperandoOperando(false);
+    } else if (esperandoOperando) {
+      setValorExibido(String(numero));
+      setEsperandoOperando(false);
+    } else {
+      setValorExibido(valorExibido === '0' ? String(numero) : valorExibido + numero);
+    }
+  };
+
+  const aoPressionarDecimal = () => {
+    if (temErro) {
+      setValorExibido('0.');
+      limparErro();
+      setEsperandoOperando(false);
+      return;
+    }
+    if (esperandoOperando) {
+      setValorExibido('0.');
+      setEsperandoOperando(false);
+    } else if (!valorExibido.includes('.')) {
+      setValorExibido(valorExibido + '.');
+    }
+  };
+
+  const calcular = (valAnterior, valAtual, op) => {
+    const valorAnteriorNum = parseFloat(valAnterior);
+    const valorAtualNum = parseFloat(valAtual);
+
+    if (isNaN(valorAnteriorNum) || isNaN(valorAtualNum)) return NaN;
+
+    switch (op) {
+      case '+':
+        return valorAnteriorNum + valorAtualNum;
+      case '-':
+        return valorAnteriorNum - valorAtualNum;
+      case '*':
+        return valorAnteriorNum * valorAtualNum;
+      case '/':
+        return valorAtualNum === 0 ? NaN : valorAnteriorNum / valorAtualNum;
+      default:
+        return valorAtualNum;
+    }
+  };
+
+  const aoPressionarOperador = (proximoOperador) => {
+    if (temErro && valorExibido === MENSAGEM_EXPRESSAO_INVALIDA) {
+      limparErro();
+      if (operandoAnterior !== null && !isNaN(operandoAnterior)) {
+        setValorExibido(String(operandoAnterior));
+      } else {
+        setValorExibido('0');
+        setOperandoAnterior(null);
+      }
+    } else if (temErro) {
+      limparErro();
+      setValorExibido('0');
+      setOperandoAnterior(null);
+    }
+
+    const valorEntradaNumerico = parseFloat(valorExibido);
+
+    if (isNaN(valorEntradaNumerico)) {
+      definirErro(MENSAGEM_ERRO_CALCULO);
+      setOperandoAnterior(null);
+      setOperadorSelecionado(null);
+      setEsperandoOperando(true);
+      return;
+    }
+
+    if (operadorSelecionado && operandoAnterior !== null && !esperandoOperando) {
+      const resultadoParcial = calcular(operandoAnterior, valorEntradaNumerico, operadorSelecionado);
+      if (isNaN(resultadoParcial)) {
+        definirErro(MENSAGEM_ERRO_CALCULO);
+        setOperandoAnterior(null);
+        setOperadorSelecionado(null);
+        setEsperandoOperando(true);
+        return;
+      }
+      const resultadoFormatado = String(parseFloat(resultadoParcial.toFixed(7)));
+      setValorExibido(resultadoFormatado);
+      setOperandoAnterior(resultadoParcial);
+    } else {
+      setOperandoAnterior(valorEntradaNumerico);
+    }
+
+    setEsperandoOperando(true);
+    setOperadorSelecionado(proximoOperador);
+  };
+
+  const aoPressionarIgual = () => {
+    if (operandoAnterior !== null && operadorSelecionado) {
+      if (esperandoOperando) {
+        definirErro(MENSAGEM_EXPRESSAO_INVALIDA);
+        return;
+      }
+
+      if (temErro) return;
+
+      const valorAtualFloat = parseFloat(valorExibido);
+      if (isNaN(valorAtualFloat)) {
+        definirErro(MENSAGEM_ERRO_CALCULO);
+        setOperandoAnterior(null);
+        setOperadorSelecionado(null);
+        setEsperandoOperando(true);
+        return;
+      }
+
+      const resultado = calcular(operandoAnterior, valorAtualFloat, operadorSelecionado);
+
+      if (isNaN(resultado)) {
+        definirErro(MENSAGEM_ERRO_CALCULO);
+        setOperandoAnterior(null);
+        setOperadorSelecionado(null);
+      } else {
+        const resultadoFormatado = String(parseFloat(resultado.toFixed(7)));
+        setValorExibido(resultadoFormatado);
+        limparErro();
+        setOperandoAnterior(resultado);
+        setOperadorSelecionado(null);
+      }
+      setEsperandoOperando(true);
+    }
+  };
+
+  const aoPressionarApagar = () => {
+    if (temErro) {
+      setValorExibido('0');
+      limparErro();
+      return;
+    }
+    if (esperandoOperando && valorExibido === String(operandoAnterior)) {
+      return;
+    }
+    if (valorExibido === '0') return;
+
+    if (valorExibido.length === 1 || (valorExibido.length === 2 && valorExibido.startsWith('-'))) {
+      setValorExibido('0');
+    } else {
+      let novoValor = valorExibido.slice(0, -1);
+      if (novoValor === '-') novoValor = '0';
+      setValorExibido(novoValor);
+    }
+  };
+
+  let textoBotaoLimpar = 'AC';
+  if (temErro) {
+    textoBotaoLimpar = 'C';
+  } else if (valorExibido !== '0') {
+    textoBotaoLimpar = 'C';
+  } else {
+    if (operadorSelecionado && esperandoOperando) {
+      textoBotaoLimpar = 'C';
+    } else {
+      textoBotaoLimpar = 'AC';
+    }
+  }
+
+  const aoPressionarLimpar = () => {
+    if (textoBotaoLimpar === 'AC') {
+      setValorExibido('0');
+      setOperandoAnterior(null);
+      setOperadorSelecionado(null);
+      setEsperandoOperando(false);
+      limparErro();
+    } else {
+      setValorExibido('0');
+      limparErro();
+      if (!esperandoOperando) {
+        setOperandoAnterior(null);
+        setOperadorSelecionado(null);
+      }
+    }
+  };
+
+  const aoPressionarMaisMenos = () => {
+    if (temErro || valorExibido === '0' || valorExibido === '-0') return;
+    const valorNumerico = parseFloat(valorExibido);
+    setValorExibido(String(valorNumerico * -1));
+  };
+
+  // Modified renderizarBotao to accept specific styles for the zero button
+  const renderizarBotao = (texto, onPress, estiloBaseConfig, estiloTextoBaseConfig, simboloOperador = null, isZeroButton = false) => {
+    const ativo = simboloOperador === operadorSelecionado && esperandoOperando && !temErro;
+
+    let estiloBotao = [estilos.botao, estiloBaseConfig];
+    let estiloTexto = [estilos.textoBotao, estiloTextoBaseConfig];
+
+    if (isZeroButton) {
+      // estiloBotaoZero will define specific width and text alignment for '0'
+      estiloBotao.push(estilos.botaoZeroSpecifics);
+    }
+
+    if (ativo) {
+      if (estiloBaseConfig === estilos.botaoLaranja) {
+        estiloBotao.push(estilos.botaoLaranjaAtivo);
+        estiloTexto.push(estilos.textoLaranjaAtivo);
+      }
+    }
+
+    return (
+      <TouchableOpacity
+        style={estiloBotao}
+        onPress={onPress}
+      >
+        <Text style={estiloTexto}>{texto}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // Define button layout data using useMemo to avoid redefining on every render unless dependencies change.
+  // Dependencies are functions from App's scope and textoBotaoLimpar.
+  const botoesLayout = useMemo(() => [
+    { id: 'limpar', text: textoBotaoLimpar, onPress: aoPressionarLimpar, styleBase: estilos.botaoCinzaClaro, textStyleBase: estilos.textoPreto },
+    { id: 'maisMenos', text: '+/-', onPress: aoPressionarMaisMenos, styleBase: estilos.botaoCinzaClaro, textStyleBase: estilos.textoPreto },
+    { id: 'apagar', text: '⌫', onPress: aoPressionarApagar, styleBase: estilos.botaoCinzaClaro, textStyleBase: estilos.textoPreto },
+    { id: 'dividir', text: '÷', onPress: () => aoPressionarOperador('/'), styleBase: estilos.botaoLaranja, textStyleBase: estilos.textoBranco, operatorSymbol: '/' },
+
+    { id: '7', text: '7', onPress: () => aoPressionarNumero(7), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: '8', text: '8', onPress: () => aoPressionarNumero(8), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: '9', text: '9', onPress: () => aoPressionarNumero(9), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: 'multiplicar', text: '×', onPress: () => aoPressionarOperador('*'), styleBase: estilos.botaoLaranja, textStyleBase: estilos.textoBranco, operatorSymbol: '*' },
+
+    { id: '4', text: '4', onPress: () => aoPressionarNumero(4), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: '5', text: '5', onPress: () => aoPressionarNumero(5), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: '6', text: '6', onPress: () => aoPressionarNumero(6), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: 'subtrair', text: '-', onPress: () => aoPressionarOperador('-'), styleBase: estilos.botaoLaranja, textStyleBase: estilos.textoBranco, operatorSymbol: '-' },
+
+    { id: '1', text: '1', onPress: () => aoPressionarNumero(1), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: '2', text: '2', onPress: () => aoPressionarNumero(2), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: '3', text: '3', onPress: () => aoPressionarNumero(3), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: 'somar', text: '+', onPress: () => aoPressionarOperador('+'), styleBase: estilos.botaoLaranja, textStyleBase: estilos.textoBranco, operatorSymbol: '+' },
+
+    { id: 'zero', text: '0', onPress: () => aoPressionarNumero(0), styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco, isZero: true },
+    { id: 'decimal', text: '.', onPress: aoPressionarDecimal, styleBase: estilos.botaoCinzaEscuro, textStyleBase: estilos.textoBranco },
+    { id: 'igual', text: '=', onPress: aoPressionarIgual, styleBase: estilos.botaoLaranja, textStyleBase: estilos.textoBranco },
+    // Add a placeholder for the 4th item in the last row if '0' spans 2 columns and we want to maintain a 4-column grid structure
+    // Or, ensure FlatList layout handles it. If '0' takes width of 2 buttons + 1 gap, the remaining 2 buttons fit.
+    // For simplicity, if '0' spans 2 visual slots, it takes 1 slot in data. The next item '.' starts after it.
+  ], [textoBotaoLimpar, aoPressionarLimpar, aoPressionarMaisMenos, aoPressionarApagar, aoPressionarOperador, aoPressionarNumero, aoPressionarDecimal, aoPressionarIgual]);
+  // Note: Listing all function dependencies in useMemo can be verbose.
+  // A common pattern if functions are stable (defined with useCallback or outside) is to omit them or use a simpler dependency.
+  // For this case, `textoBotaoLimpar` is the main dynamic part for the array structure itself.
+
+  const renderBotaoItem = ({ item }) => {
+    // The text for 'limpar' button is dynamic, already handled by `botoesLayout` useMemo dependency.
+    // Or, can be handled here: const buttonText = item.id === 'limpar' ? textoBotaoLimpar : item.text;
+    return renderizarBotao(
+      item.text,
+      item.onPress,
+      item.styleBase,
+      item.textStyleBase,
+      item.operatorSymbol,
+      item.isZero // Pass the flag for special styling
+    );
+  };
+
+  return (
+    <View style={[estilos.container, temErro && estilos.containerErro]}>
+      <View style={estilos.visorContainer}>
+        <Text style={estilos.textoVisor} numberOfLines={1} ellipsizeMode="head">
+          {valorExibido}
+        </Text>
+      </View>
+
+      <View style={estilos.tecladoContainer}>
+        <FlatList
+          data={botoesLayout}
+          renderItem={renderBotaoItem}
+          keyExtractor={(item) => item.id}
+          numColumns={4}
+          // Apply styles to the wrapper of each row
+          columnWrapperStyle={estilos.linhaBotoesFlatList}
+          // Optional: style for the FlatList itself if needed
+          // style={estilos.flatList}
+        />
+      </View>
+    </View>
+  );
+}
+
+const estilos = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'flex-end',
+  },
+  containerErro: {
+    backgroundColor: '#600',
+  },
+  visorContainer: {
+    paddingHorizontal: 25,
+    paddingBottom: 20,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    minHeight: 120,
+  },
+  textoVisor: {
+    fontSize: 70,
+    color: '#fff',
+    fontWeight: '300',
+    textAlign: 'right',
+  },
+  tecladoContainer: {
+    paddingBottom: 20,
+    // Add horizontal padding to the container of FlatList to ensure
+    // 'space-between' in columnWrapperStyle doesn't push edge buttons to the screen edge.
+    // Or ensure MARGIN_HORIZONTAL_BOTAO is applied correctly to create gaps.
+    paddingHorizontal: MARGIN_HORIZONTAL_BOTAO / 2, // Small padding for overall list alignment
+  },
+  // Styles for FlatList rows
+  linhaBotoesFlatList: {
+    justifyContent: 'flex-start', // Let margins on items handle spacing
+    marginBottom: MARGIN_VERTICAL_BOTAO_ROW,
+    // If using 'space-between' or 'space-around', ensure FlatList container has padding
+    // justifyContent: 'space-between',
+  },
+  botao: {
+    width: TAMANHO_BOTAO,
+    height: TAMANHO_BOTAO,
+    borderRadius: TAMANHO_BOTAO / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Each button has horizontal margin to create gaps
+    marginHorizontal: MARGIN_HORIZONTAL_BOTAO,
+  },
+  textoBotao: {
+    fontSize: TAMANHO_BOTAO * 0.35,
+    color: '#fff',
+  },
+  botaoCinzaClaro: {
+    backgroundColor: '#a5a5a5',
+  },
+  botaoCinzaEscuro: {
+    backgroundColor: '#333333',
+  },
+  botaoLaranja: {
+    backgroundColor: '#f1a33c',
+  },
+  botaoLaranjaAtivo: {
+    backgroundColor: '#fff',
+  },
+  textoLaranjaAtivo: {
+    color: '#f1a33c',
+  },
+  // Specific styles for the '0' button (width, text alignment)
+  // These are ADDED to the base button styles
+  botaoZeroSpecifics: {
+    // Width of 2 buttons + the margin that would be between them
+    width: (TAMANHO_BOTAO * 2) + (MARGIN_HORIZONTAL_BOTAO * 2),
+    alignItems: 'flex-start',
+    paddingLeft: TAMANHO_BOTAO * 0.4,
+  },
+  textoPreto: {
+    color: '#000',
+  },
+  textoBranco: {
+    color: '#fff',
+  },
+});
