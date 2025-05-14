@@ -1,7 +1,10 @@
 {
   "expo": {
-    "name": "ChallengeRealm",
-    "slug": "ChallengeRealm",
-    "version": "1.0.0"
+    "name": "iscClalc",
+    "slug": "iscClalc",
+    "version": "1.0.0",
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

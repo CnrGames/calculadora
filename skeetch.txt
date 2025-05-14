@@ -1,0 +1,239 @@
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions } from 'react-native';
+
+// Obtém a largura da tela para ajudar no dimensionamento responsivo
+const { width } = Dimensions.get('window');
+const TAMANHO_BOTAO = width / 4.5; // Define um tamanho base para os botões
+
+export default function App() {
+  // Estado para armazenar o valor atual exibido na calculadora
+  const [valorExibido, setValorExibido] = useState('0');
+  // Estado para armazenar o operando anterior (número antes do operador)
+  const [operandoAnterior, setOperandoAnterior] = useState(null);
+  // Estado para armazenar o operador selecionado (+, -, *, /)
+  const [operador, setOperador] = useState(null);
+  // Estado para controlar se o próximo dígito deve substituir o valor exibido (após um operador ser pressionado)
+  const [esperandoOperando, setEsperandoOperando] = useState(false);
+
+  // Função para lidar com a entrada de números
+  const aoPressionarNumero = (numero) => {
+    if (esperandoOperando) {
+      setValorExibido(String(numero));
+      setEsperandoOperando(false);
+    } else {
+      // Evita múltiplos zeros no início ou substitui o zero inicial
+      setValorExibido(valorExibido === '0' ? String(numero) : valorExibido + numero);
+    }
+  };
+
+  // Função para lidar com a entrada do ponto decimal
+  const aoPressionarDecimal = () => {
+    // Adiciona o ponto decimal apenas se ainda não existir no valor exibido
+    if (!valorExibido.includes('.')) {
+      setValorExibido(valorExibido + '.');
+      setEsperandoOperando(false); // Permite continuar digitando após o decimal
+    }
+  };
+
+  // Função para lidar com a seleção de um operador
+  const aoPressionarOperador = (proximoOperador) => {
+    const valorEntrada = parseFloat(valorExibido);
+
+    // Se já houver um operador e um operando anterior, calcula o resultado parcial
+    if (operador && operandoAnterior !== null && !esperandoOperando) {
+      const resultado = calcular();
+      setValorExibido(String(parseFloat(resultado.toFixed(7)))); // Limita a 7 casas decimais e remove zeros desnecessários
+      setOperandoAnterior(resultado);
+    } else {
+      setOperandoAnterior(valorEntrada);
+    }
+
+    setEsperandoOperando(true);
+    setOperador(proximoOperador);
+  };
+
+  // Função para calcular o resultado da operação
+  const calcular = () => {
+    const valorAtual = parseFloat(valorExibido);
+    const valorAnterior = parseFloat(operandoAnterior);
+
+    if (isNaN(valorAnterior) || isNaN(valorAtual)) return 0; // Proteção contra NaN
+
+    switch (operador) {
+      case '+':
+        return valorAnterior + valorAtual;
+      case '-':
+        return valorAnterior - valorAtual;
+      case '*':
+        return valorAnterior * valorAtual;
+      case '/':
+        // Proteção contra divisão por zero
+        return valorAtual === 0 ? NaN : valorAnterior / valorAtual;
+      default:
+        return valorAtual; // Retorna o valor atual se não houver operador
+    }
+  };
+
+  // Função para lidar com o pressionar do botão de igual (=)
+  const aoPressionarIgual = () => {
+    if (operador && operandoAnterior !== null) {
+      const resultado = calcular();
+      if (isNaN(resultado)) {
+        setValorExibido('Erro'); // Exibe "Erro" em caso de divisão por zero
+      } else {
+        setValorExibido(String(parseFloat(resultado.toFixed(7))));
+      }
+      setOperandoAnterior(null);
+      setOperador(null);
+      setEsperandoOperando(true); // Prepara para uma nova entrada ou continuação do cálculo com o resultado
+    }
+  };
+
+  // Função para limpar todos os estados (AC - All Clear)
+  const aoPressionarLimpar = () => {
+    setValorExibido('0');
+    setOperandoAnterior(null);
+    setOperador(null);
+    setEsperandoOperando(false);
+  };
+
+  // Função para inverter o sinal do número exibido (+/-)
+  const aoPressionarMaisMenos = () => {
+    const valorNumerico = parseFloat(valorExibido);
+    if (valorNumerico === 0) return; // Não faz nada se for zero
+    setValorExibido(String(valorNumerico * -1));
+  };
+
+  // Função para calcular a porcentagem
+  const aoPressionarPorcentagem = () => {
+    const valorNumerico = parseFloat(valorExibido);
+    setValorExibido(String(valorNumerico / 100));
+    // setEsperandoOperando(true); // Opcional: pode-se querer que após % o próximo número inicie uma nova entrada
+  };
+
+
+  // Função auxiliar para renderizar cada botão
+  const renderizarBotao = (texto, onPress, estiloExtraBotao, estiloExtraTexto) => (
+    <TouchableOpacity
+      style={[estilos.botao, estiloExtraBotao]}
+      onPress={onPress}
+    >
+      <Text style={[estilos.textoBotao, estiloExtraTexto]}>{texto}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={estilos.container}>
+      {/* Visor da Calculadora */}
+      <View style={estilos.visorContainer}>
+        <Text style={estilos.textoVisor} numberOfLines={1} ellipsizeMode="head">
+          {valorExibido}
+        </Text>
+      </View>
+
+      {/* Teclado da Calculadora */}
+      <View style={estilos.tecladoContainer}>
+        {/* Linha 1 */}
+        <View style={estilos.linhaBotoes}>
+          {renderizarBotao(valorExibido !== '0' || operador ? 'C' : 'AC', aoPressionarLimpar, estilos.botaoCinzaClaro, estilos.textoPreto)}
+          {renderizarBotao('+/-', aoPressionarMaisMenos, estilos.botaoCinzaClaro, estilos.textoPreto)}
+          {renderizarBotao('%', aoPressionarPorcentagem, estilos.botaoCinzaClaro, estilos.textoPreto)}
+          {renderizarBotao('÷', () => aoPressionarOperador('/'), estilos.botaoLaranja, estilos.textoBranco)}
+        </View>
+
+        {/* Linha 2 */}
+        <View style={estilos.linhaBotoes}>
+          {renderizarBotao('7', () => aoPressionarNumero(7), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('8', () => aoPressionarNumero(8), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('9', () => aoPressionarNumero(9), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('×', () => aoPressionarOperador('*'), estilos.botaoLaranja, estilos.textoBranco)}
+        </View>
+
+        {/* Linha 3 */}
+        <View style={estilos.linhaBotoes}>
+          {renderizarBotao('4', () => aoPressionarNumero(4), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('5', () => aoPressionarNumero(5), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('6', () => aoPressionarNumero(6), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('-', () => aoPressionarOperador('-'), estilos.botaoLaranja, estilos.textoBranco)}
+        </View>
+
+        {/* Linha 4 */}
+        <View style={estilos.linhaBotoes}>
+          {renderizarBotao('1', () => aoPressionarNumero(1), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('2', () => aoPressionarNumero(2), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('3', () => aoPressionarNumero(3), estilos.botaoCinzaEscuro)}
+          {renderizarBotao('+', () => aoPressionarOperador('+'), estilos.botaoLaranja, estilos.textoBranco)}
+        </View>
+
+        {/* Linha 5 */}
+        <View style={estilos.linhaBotoes}>
+          {renderizarBotao('0', () => aoPressionarNumero(0), [estilos.botaoCinzaEscuro, estilos.botaoZero])}
+          {renderizarBotao('.', aoPressionarDecimal, estilos.botaoCinzaEscuro)}
+          {renderizarBotao('=', aoPressionarIgual, estilos.botaoLaranja, estilos.textoBranco)}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// Estilos da aplicação
+const estilos = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000', // Fundo preto, como calculadoras iOS
+    justifyContent: 'flex-end', // Alinha o teclado para baixo
+  },
+  visorContainer: {
+    // flex: 1, // O visor ocupa o espaço restante
+    paddingHorizontal: 25,
+    paddingBottom: 20, // Espaçamento inferior
+    justifyContent: 'flex-end', // Alinha o texto do visor para baixo
+    alignItems: 'flex-end', // Alinha o texto do visor para a direita
+    minHeight: 120, // Altura mínima para o visor
+  },
+  textoVisor: {
+    fontSize: 70, // Tamanho grande para o texto do visor
+    color: '#fff', // Texto branco
+    fontWeight: '300', // Peso da fonte leve
+  },
+  tecladoContainer: {
+    paddingBottom: 20, // Espaçamento na parte inferior do teclado
+  },
+  linhaBotoes: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly', // Distribui os botões igualmente na linha
+    marginBottom: TAMANHO_BOTAO * 0.15, // Margem entre as linhas de botões
+  },
+  botao: {
+    width: TAMANHO_BOTAO,
+    height: TAMANHO_BOTAO,
+    borderRadius: TAMANHO_BOTAO / 2, // Botões redondos
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 5,
+  },
+  textoBotao: {
+    fontSize: TAMANHO_BOTAO * 0.4, // Tamanho do texto proporcional ao botão
+    color: '#fff', // Cor padrão do texto do botão
+  },
+  botaoCinzaClaro: {
+    backgroundColor: '#a5a5a5', // Cor para botões de funções (AC, +/-, %)
+  },
+  botaoCinzaEscuro: {
+    backgroundColor: '#333333', // Cor para botões numéricos e decimal
+  },
+  botaoLaranja: {
+    backgroundColor: '#f1a33c', // Cor para botões de operadores e igual
+  },
+  botaoZero: {
+    width: TAMANHO_BOTAO * 2 + TAMANHO_BOTAO * 0.15, // Botão zero mais largo
+    alignItems: 'flex-start', // Alinha o texto '0' à esquerda dentro do botão
+    paddingLeft: TAMANHO_BOTAO * 0.4,
+  },
+  textoPreto: {
+    color: '#000', // Cor do texto para botões cinza claro
+  },
+  textoBranco: { // Estilo explícito para texto branco, embora seja o padrão para textoBotao
+    color: '#fff',
+  },
+});
